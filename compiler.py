@@ -1,6 +1,5 @@
 import aiohttp
 
-# Mapping file extensions to Piston API language names
 PISTON_LANG_MAP = {
     "py": "python",
     "js": "javascript",
@@ -16,7 +15,7 @@ PISTON_LANG_MAP = {
 
 async def execute_source_code(syntax: str, raw_lines: list) -> str:
     """
-    Sends raw source code to the remote sandboxed Piston execution engine.
+    Sends raw source code to an open public execution sandbox.
     Returns the console output string (stdout, stderr, or error messaging).
     """
     piston_lang = PISTON_LANG_MAP.get(syntax)
@@ -33,7 +32,8 @@ async def execute_source_code(syntax: str, raw_lines: list) -> str:
 
     try:
         async with aiohttp.ClientSession() as web_client:
-            async with web_client.post("https://emkc.org", json=payload) as api_response:
+            # Swapping to a fully open public community Piston router endpoint
+            async with web_client.post("https://api.emkc.org/api/v2/piston/execute", json=payload) as api_response:
                 if api_response.status == 200:
                     result_data = await api_response.json()
                     run_output = result_data.get("run", {})
@@ -44,7 +44,6 @@ async def execute_source_code(syntax: str, raw_lines: list) -> str:
                     if not console_log:
                         return "Process executed successfully with no output returned."
 
-                    # Enforce maximum safe character boundaries for a Discord message
                     return console_log[:1900]
                 else:
                     return f"Error: Compiler container engine returned unexpected code {api_response.status}."
