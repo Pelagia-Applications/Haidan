@@ -1,7 +1,6 @@
 import aiohttp
 
-# Mapping file extensions to Piston API language names
-PISTON_LANG_MAP = {
+GLOT_LANG_MAP = {
     "py": "python",
     "js": "javascript",
     "ts": "typescript",
@@ -16,40 +15,55 @@ PISTON_LANG_MAP = {
 
 async def execute_source_code(syntax: str, raw_lines: list) -> str:
     """
-    Sends raw source code to an open public execution sandbox mirror.
-    Bypasses local SSL checking to prevent hosting provider verification blocks.
+    Sends raw source code to the Glot.io open public execution sandbox.
     """
-    piston_lang = PISTON_LANG_MAP.get(syntax)
+    glot_lang = GLOT_LANG_MAP.get(syntax)
 
-    if not piston_lang:
+    if not glot_lang:
         return f"Error: The file extension type `.{syntax}` does not support compilation pipelines."
 
     raw_source = "\n".join(raw_lines)
+    
+    # Glot.io expects a structural JSON layout tracking file properties
     payload = {
-        "language": piston_lang,
-        "version": "*",
-        "files": [{"content": raw_source}]
+        "files": [
+            {
+                "name": f"main.{syntax}",
+                "content": raw_source
+            }
+        ]
     }
 
-    # Bypasses local verification checks to resolve host configuration handshakes
+    # Bypasses local verification checks to resolve host configuration handshakes smoothly
     ssl_context = aiohttp.TCPConnector(ssl=False)
 
     try:
         async with aiohttp.ClientSession(connector=ssl_context) as web_client:
-            # Using the direct stable community server node router
-            async with web_client.post("https://emkc.org", json=payload) as api_response:
+            # Pushing execution request directly through Glot's open runner service
+            url = f"https://glot.io{glot_lang}/latest"
+            
+            async with web_client.post(url, json=payload) as api_response:
                 if api_response.status == 200:
                     result_data = await api_response.json()
-                    run_output = result_data.get("run", {})
-                    stdout = run_output.get("stdout", "")
-                    stderr = run_output.get("stderr", "")
                     
-                    console_log = stdout if stdout else stderr
+                    stdout = result_data.get("stdout", "")
+                    stderr = result_data.get("stderr", "")
+                    error = result_data.get("error", "")
+                    
+                    # Combine output metrics safely
+                    console_log = ""
+                    if stdout:
+                        console_log += stdout
+                    if stderr:
+                        console_log += stderr
+                    if error:
+                        console_log += f"Execution Error: {error}"
+                        
                     if not console_log:
                         return "Process executed successfully with no output returned."
 
                     return console_log[:1900]
                 else:
-                    return f"Error: Compiler container engine returned unexpected status code {api_response.status}."
+                    return f"Error: Sandbox compiler engine returned unexpected status code {api_response.status}."
     except Exception as e:
         return f"Runtime execution connection failed: {str(e)}"
