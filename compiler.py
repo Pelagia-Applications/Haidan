@@ -1,6 +1,7 @@
 import aiohttp
 
-GLOT_LANG_MAP = {
+# Mapping file extensions to Piston engine language identifiers
+PISTON_LANG_MAP = {
     "py": "python",
     "js": "javascript",
     "ts": "typescript",
@@ -15,50 +16,37 @@ GLOT_LANG_MAP = {
 
 async def execute_source_code(syntax: str, raw_lines: list) -> str:
     """
-    Sends raw source code to the Glot.io open public execution sandbox.
+    Sends raw source code to an open public execution sandbox.
+    Bypasses local SSL checking to ensure Render connects without certificate blocks.
     """
-    glot_lang = GLOT_LANG_MAP.get(syntax)
+    piston_lang = PISTON_LANG_MAP.get(syntax)
 
-    if not glot_lang:
-        return f"Error: The file extension type `.{syntax}` does not support compilation pipelines."
+    if not piston_lang:
+        return f"Error: The file extension type `.{syntax}` does not support execution."
 
     raw_source = "\n".join(raw_lines)
-    
-    # Glot.io expects a structural JSON layout tracking file properties
     payload = {
-        "files": [
-            {
-                "name": f"main.{syntax}",
-                "content": raw_source
-            }
-        ]
+        "language": piston_lang,
+        "version": "*",
+        "files": [{"content": raw_source}]
     }
 
-    # Bypasses local verification checks to resolve host configuration handshakes smoothly
+    # Disables strict SSL validation handshakes to clear hosting verification errors
     ssl_context = aiohttp.TCPConnector(ssl=False)
 
     try:
         async with aiohttp.ClientSession(connector=ssl_context) as web_client:
-            # Pushing execution request directly through Glot's open runner service
-            url = f"https://glot.io{glot_lang}/latest"
+            # Routing via EngineerMan's public unauthenticated sandbox executor cluster
+            url = "https://engineer-man.org"
             
             async with web_client.post(url, json=payload) as api_response:
                 if api_response.status == 200:
                     result_data = await api_response.json()
+                    run_output = result_data.get("run", {})
+                    stdout = run_output.get("stdout", "")
+                    stderr = run_output.get("stderr", "")
                     
-                    stdout = result_data.get("stdout", "")
-                    stderr = result_data.get("stderr", "")
-                    error = result_data.get("error", "")
-                    
-                    # Combine output metrics safely
-                    console_log = ""
-                    if stdout:
-                        console_log += stdout
-                    if stderr:
-                        console_log += stderr
-                    if error:
-                        console_log += f"Execution Error: {error}"
-                        
+                    console_log = stdout if stdout else stderr
                     if not console_log:
                         return "Process executed successfully with no output returned."
 
