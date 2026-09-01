@@ -42,11 +42,21 @@ class CodeEditorView(ui.View):
     async def delete_line(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(DeleteLineModal(self.thread_id))
 
-    @ui.button(label="Delete File Content", style=discord.ButtonStyle.danger, custom_id="delete_file_btn")
+    @ui.button(label="Clear File Content", style=discord.ButtonStyle.danger, custom_id="delete_file_btn")
     async def delete_file(self, interaction: discord.Interaction, button: ui.Button):
         if self.thread_id in editor_sessions:
             editor_sessions[self.thread_id]["lines"] = []
         await refresh_workspace_display(interaction, self.thread_id)
+
+    @ui.button(label="Remove File From Workspace", style=discord.ButtonStyle.danger, custom_id="remove_file_btn", row=1)
+    async def remove_file(self, interaction: discord.Interaction, button: ui.Button):
+        # Delete the workspace session from memory completely
+        if self.thread_id in editor_sessions:
+            del editor_sessions[self.thread_id]
+            
+        display_content = "### Workspace Closed\nThe file session has been completely removed from memory. Use the initialization command to open a new file."
+        # Update message and remove the action buttons
+        await interaction.response.edit_message(content=display_content, view=None)
 
 class EditLineModal(ui.Modal, title="Write / Modify Code"):
     line_num = ui.TextInput(label="Line Number (Leave blank to append)", required=False, placeholder="e.g., 1")
@@ -124,7 +134,6 @@ class CodeEditorBot(commands.Bot):
 
 bot = CodeEditorBot()
 
-# This function tells Discord exactly what parameters to expect
 async def initialize_editor_callback(interaction: discord.Interaction, project_name: str):
     channel = interaction.channel
     
@@ -179,7 +188,6 @@ async def initialize_editor_callback(interaction: discord.Interaction, project_n
 
 parts = [p.strip().lower() for p in INIT_COMMAND_NAME.split(" ") if p.strip()]
 
-# Building the command parameters safely using function inspection mapping
 if len(parts) == 3:
     base_name, group_name, cmd_name = parts
     base_group = app_commands.Group(name=base_name, description=f"{base_name} root commands")
@@ -209,9 +217,8 @@ elif len(parts) == 2:
     bot.tree.add_command(base_group)
 
 else:
-    # Safely creates single-word commands (like /editor) with project_name auto-mapped
     actual_command = app_commands.Command(
-        name=parts[0], 
+        name=parts, 
         description="Deploy a private workspace thread to isolate code creation", 
         callback=initialize_editor_callback
     )
