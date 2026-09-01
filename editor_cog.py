@@ -203,33 +203,54 @@ class EditorCog(commands.Cog):
         cmd_env = os.getenv("INIT_COMMAND_NAME", "urchin init editor")
         parts = [p.strip().lower() for p in cmd_env.split(" ") if p.strip()]
 
+        # 1. Create your compilation runner command as a standalone root command: /urchin run
+        # This keeps it separate from any "init" subgroups entirely
+        urchin_group = app_commands.Group(name="urchin", description="Urchin workspace core engine commands")
+        
+        run_cmd = app_commands.Command(
+            name="run", 
+            description="Execute the active target workspace source file", 
+            callback=run_code_callback
+        )
+        urchin_group.add_command(run_cmd)
+
+        # 2. Build your initialization command based on your exact env structure
         if len(parts) == 3:
+            # Handles: /urchin init editor
             base_name, group_name, cmd_name = parts
-            base_group = app_commands.Group(name=base_name, description=f"{base_name} root commands")
-            sub_group = app_commands.Group(name=group_name, description=f"{group_name} actions")
             
-            init_cmd = app_commands.Command(name=cmd_name, description="Deploy a private workspace thread to isolate code creation", callback=initialize_editor_callback)
-            run_cmd = app_commands.Command(name="run", description="Execute the active target workspace source file", callback=run_code_callback)
+            sub_group = app_commands.Group(name=group_name, description=f"{group_name} actions")
+            init_cmd = app_commands.Command(
+                name=cmd_name, 
+                description="Deploy a private workspace thread to isolate code creation", 
+                callback=initialize_editor_callback
+            )
             
             sub_group.add_command(init_cmd)
-            sub_group.add_command(run_cmd)
-            base_group.add_command(sub_group)
-            self.bot.tree.add_command(base_group)
-
+            urchin_group.add_command(sub_group)
+            
         elif len(parts) == 2:
+            # Handles: /urchin editor
             base_name, cmd_name = parts
-            base_group = app_commands.Group(name=base_name, description=f"{base_name} root commands")
+            init_cmd = app_commands.Command(
+                name=cmd_name, 
+                description="Deploy a private workspace thread to isolate code creation", 
+                callback=initialize_editor_callback
+            )
+            urchin_group.add_command(init_cmd)
             
-            init_cmd = app_commands.Command(name=cmd_name, description="Deploy a private workspace thread to isolate code creation", callback=initialize_editor_callback)
-            run_cmd = app_commands.Command(name="run", description="Execute the active target workspace source file", callback=run_code_callback)
-            
-            base_group.add_command(init_cmd)
-            base_group.add_command(run_cmd)
-            self.bot.tree.add_command(base_group)
-
         else:
-            init_cmd = app_commands.Command(name=parts, description="Deploy a private workspace thread to isolate code creation", callback=initialize_editor_callback)
+            # Fallback flat registration
+            init_cmd = app_commands.Command(
+                name=parts[0], 
+                description="Deploy a private workspace thread to isolate code creation", 
+                callback=initialize_editor_callback
+            )
             self.bot.tree.add_command(init_cmd)
+
+        # Register our organized structural command tree node globally
+        self.bot.tree.add_command(urchin_group)
+
 
 async def setup(bot):
     await bot.add_cog(EditorCog(bot))
