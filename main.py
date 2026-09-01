@@ -228,5 +228,22 @@ async def on_ready():
     except Exception as e:
         print(f"Clean Sync Failed: {e}")
 
+import threading
+from flask import Flask
+
+# Create a tiny web app to satisfy Render's port scanning requirements
+flask_app = Flask('')
+
+@flask_app.route('/')
+def home():
+    return "Bot is running"
+
+def run_web_server():
+    # Render automatically provides the PORT environment variable
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host='0.0.0.0', port=port)
+
 if __name__ == "__main__":
+    threading.Thread(target=run_web_server, daemon=True).start()
     bot.run(BOT_TOKEN)
+
